@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "CheatSheet",
+	"Description": "Simple cheat sheet in the gameplay debugger",
+	"Category": "Other",
+	"CreatedBy": "Andrew Ivashkin",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "CheatSheet",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	]
+}
