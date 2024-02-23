@@ -15,12 +15,17 @@ namespace
 
 }
 
+namespace FCheatSheetNamespace
+{
+	float RefreshInterval = 5.f;
+	int32 MaxCheatPageRows = 20;
+}
 
 FCheatSheet_GameplayDebuggerCategory::FCheatSheet_GameplayDebuggerCategory()
 {
 	bShowOnlyWithDebugActor = false;
 	bShowDataPackReplication = true;
-	CollectDataInterval = 2.f;
+	CollectDataInterval = FCheatSheetNamespace::RefreshInterval;
 	SetDataPackReplication<FRepData>(&DataPack);
 
 	const FGameplayDebuggerInputHandlerConfig CycleActorReference(TEXT("Next cheat page"), TEXT("Subtract"), FGameplayDebuggerInputModifier::Shift);
@@ -37,8 +42,15 @@ void FCheatSheet_GameplayDebuggerCategory::DrawData(APlayerController* OwnerPC,	
 	{
 		CanvasContext.Printf(TEXT("Console variables were not found, fill CheatSheetConfig.ini !{yellow}"));
 	}
-	
-	for(int32 i = 0; i < DataPack.ConsoleVariableNames.Num() - 1; ++i)
+
+	const int32 StartingCheatIndex = FCheatSheetNamespace::MaxCheatPageRows * CurrentCheatPage;
+	const int32 EndingCheatIndex = StartingCheatIndex + FCheatSheetNamespace::MaxCheatPageRows;
+	const int32 EndingCheatIndexSafe = EndingCheatIndex <= DataPack.ConsoleVariableNames.Num()
+	? EndingCheatIndex
+	: (DataPack.ConsoleVariableNames.Num() - EndingCheatIndex);
+
+	UE_LOG(LogTemp, Warning, TEXT("StartingCheatIndex: %i, EndingCheatIndexSafe: %i"), StartingCheatIndex, EndingCheatIndexSafe);
+	for(int32 i = StartingCheatIndex; i < EndingCheatIndexSafe - 1; ++i)
 	{
 		CanvasContext.Printf(TEXT("%ls {white}%ls"), *DataPack.ConsoleVariableNames[i], *DataPack.ConsoleVariableDescriptions[i]);
 	}
@@ -50,7 +62,7 @@ void FCheatSheet_GameplayDebuggerCategory::CollectData(APlayerController* OwnerP
 {
 	FString ConfigFilePath = IPluginManager::Get().FindPlugin("CheatSheet")->GetBaseDir() / TEXT("Config") / TEXT("CheatSheetConfig.ini");
 	GConfig->GetArray(TEXT("CheatSheetConfig"), TEXT("Cheat"), CheatKeyWords, ConfigFilePath);
-	
+
 	const IConsoleManager& ConsoleManager = IConsoleManager::Get();
 	auto OnConsoleVariable = [&](const TCHAR *Name, IConsoleObject* CVar)
 	{
@@ -58,11 +70,14 @@ void FCheatSheet_GameplayDebuggerCategory::CollectData(APlayerController* OwnerP
 		DataPack.ConsoleVariableDescriptions.Add(CVar->GetHelp()); 
 		UE_LOG(LogTemp, Warning, TEXT("Variable Name: %s"), Name);
 	};
-	
+
 	for(auto& KeyWord : CheatKeyWords)
 	{
 		ConsoleManager.ForEachConsoleObjectThatContains(FConsoleObjectVisitor::CreateLambda(OnConsoleVariable), *KeyWord);
 	}
+
+	MaxPagesCount = FMath::FloorToInt32(static_cast<float>(DataPack.ConsoleVariableNames.Num() / FCheatSheetNamespace::MaxCheatPageRows));
+	bDataCollected = true;
 }
 
 TSharedRef<FGameplayDebuggerCategory> FCheatSheet_GameplayDebuggerCategory::MakeInstance()
@@ -100,10 +115,14 @@ void FCheatSheet_GameplayDebuggerCategory::FRepData::Serialize(FArchive& Ar)
 
 void FCheatSheet_GameplayDebuggerCategory::DrawNextPage()
 {
+	CurrentCheatPage = (CurrentCheatPage + 1) <= MaxPagesCount ? CurrentCheatPage++ : 0;
+	UE_LOG(LogTemp, Warning, TEXT("NextPage Draw, CurrentCheatPage: %i"), CurrentCheatPage);
 }
 
 void FCheatSheet_GameplayDebuggerCategory::DrawPrevPage()
 {
+	CurrentCheatPage = (CurrentCheatPage - 1) >= 0 ? CurrentCheatPage-- : MaxPagesCount;
+	UE_LOG(LogTemp, Warning, TEXT("PrevPage Draw, CurrentCheatPage: %i"), CurrentCheatPage);
 }
 
 TPair<float, float> FCheatSheet_GameplayDebuggerCategory::EvalLongestString(const TArray<FString>& Strings, const FGameplayDebuggerCanvasContext& CanvasContext)
