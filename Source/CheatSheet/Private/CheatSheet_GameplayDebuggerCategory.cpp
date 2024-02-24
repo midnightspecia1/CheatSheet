@@ -10,15 +10,19 @@
 namespace
 {
 	static FAutoConsoleVariable CVarAllowPkgVirtualization(TEXT("Mobs.AllowPkgVirtualization"),true,TEXT("When true submitting packages in the editor will no longer trigger the virtualization process"));
-	static FAutoConsoleVariable CVarAllowMobs(TEXT("Mobs.Abv.kgVirtualization"),true,TEXT("When true submitting packages in the editor will no longer trigger the virtualization process"));
+	static FAutoConsoleVariable CVarAllowMobs(TEXT("Mobs.Abv.kgVirtual"),true,TEXT("When true submitting packages in the editor will no longer trigger the virtualization process"));
 	static FAutoConsoleVariable CVarVirtualization(TEXT("Mobs.asd.AllowPkgVirtualization"),true,TEXT("When true submitting packages in the editor will no longer trigger the virtualization process"));
-
+	static FAutoConsoleVariable CVarAllowPkg(TEXT("Mobs.BBBB"),true,TEXT("When true submitting packages in the editor will no longer trigger the virtualization process"));
+	static FAutoConsoleVariable CVarAllow(TEXT("Mobs.Abv.AAAAAAAAA"),true,TEXT("When true submitting packages in the editor will no longer trigger the virtualization process"));
+	static FAutoConsoleVariable CVarA(TEXT("Mobs.asd.b"),true,TEXT("When true submitting packages in the editor will no longer trigger the virtualization process"));
 }
 
 namespace FCheatSheetNamespace
 {
 	float RefreshInterval = 5.f;
 	int32 MaxCheatPageRows = 20;
+	FName NextPageKey = TEXT("Add");
+	FName PreviousPageKey = TEXT("Subtract");
 }
 
 FCheatSheet_GameplayDebuggerCategory::FCheatSheet_GameplayDebuggerCategory()
@@ -28,15 +32,31 @@ FCheatSheet_GameplayDebuggerCategory::FCheatSheet_GameplayDebuggerCategory()
 	CollectDataInterval = FCheatSheetNamespace::RefreshInterval;
 	SetDataPackReplication<FRepData>(&DataPack);
 
-	const FGameplayDebuggerInputHandlerConfig CycleActorReference(TEXT("Next cheat page"), TEXT("Subtract"), FGameplayDebuggerInputModifier::Shift);
-	const FGameplayDebuggerInputHandlerConfig CycleNavigationData(TEXT("Previous cheat page"), TEXT("Add"), FGameplayDebuggerInputModifier::Shift);
+	const FGameplayDebuggerInputHandlerConfig NextPageHandler(TEXT("Next cheat page"), FCheatSheetNamespace::NextPageKey, FGameplayDebuggerInputModifier::Shift);
+	const FGameplayDebuggerInputHandlerConfig PrevPageHandler(TEXT("Previous cheat page"), FCheatSheetNamespace::PreviousPageKey, FGameplayDebuggerInputModifier::Shift);
 	
-	BindKeyPress(CycleActorReference, this, &FCheatSheet_GameplayDebuggerCategory::DrawNextPage, EGameplayDebuggerInputMode::Replicated);
-	BindKeyPress(CycleNavigationData, this, &FCheatSheet_GameplayDebuggerCategory::DrawPrevPage, EGameplayDebuggerInputMode::Replicated);
+	BindKeyPress(NextPageHandler, this, &FCheatSheet_GameplayDebuggerCategory::DrawNextPage, EGameplayDebuggerInputMode::Replicated);
+	BindKeyPress(PrevPageHandler, this, &FCheatSheet_GameplayDebuggerCategory::DrawPrevPage, EGameplayDebuggerInputMode::Replicated);
 }
 
 void FCheatSheet_GameplayDebuggerCategory::DrawData(APlayerController* OwnerPC,	FGameplayDebuggerCanvasContext& CanvasContext)
 {
+	FVector2D ViewPortSize;
+	GEngine->GameViewport->GetViewportSize( /*out*/ViewPortSize);
+
+	float MaxCheatWidth = 0.0f;
+	// Find longest cheat name
+	for(int32 i = 0; DataPack.ConsoleVariableNames.Num() > i; i++)
+	{
+		float StrCheatWidth = 0.0f, StrCheatHeight = 0.0f;
+		CanvasContext.MeasureString(DataPack.ConsoleVariableNames[i], StrCheatWidth, StrCheatHeight);
+		if(StrCheatWidth > MaxCheatWidth)
+		{
+			MaxCheatWidth = StrCheatWidth;
+		}
+	}
+
+	CanvasContext.Printf(TEXT("Use Shift + %s/%s to cycle pages {yellow}"), *FCheatSheetNamespace::NextPageKey.ToString(), *FCheatSheetNamespace::PreviousPageKey.ToString());
 	CanvasContext.Printf(TEXT("Founded console variables: {yellow}"));
 	if(DataPack.ConsoleVariableNames.IsEmpty())
 	{
@@ -47,12 +67,14 @@ void FCheatSheet_GameplayDebuggerCategory::DrawData(APlayerController* OwnerPC,	
 	const int32 EndingCheatIndex = StartingCheatIndex + FCheatSheetNamespace::MaxCheatPageRows;
 	const int32 EndingCheatIndexSafe = EndingCheatIndex <= DataPack.ConsoleVariableNames.Num()
 	? EndingCheatIndex
-	: (DataPack.ConsoleVariableNames.Num() - EndingCheatIndex);
-
-	UE_LOG(LogTemp, Warning, TEXT("StartingCheatIndex: %i, EndingCheatIndexSafe: %i"), StartingCheatIndex, EndingCheatIndexSafe);
+	: DataPack.ConsoleVariableNames.Num();
+	
 	for(int32 i = StartingCheatIndex; i < EndingCheatIndexSafe - 1; ++i)
 	{
-		CanvasContext.Printf(TEXT("%ls {white}%ls"), *DataPack.ConsoleVariableNames[i], *DataPack.ConsoleVariableDescriptions[i]);
+		float StrCheatWidth = 0.0f, StrCheatHeight = 0.0f;
+		CanvasContext.MeasureString(DataPack.ConsoleVariableNames[i], StrCheatWidth, StrCheatHeight);
+		FString Spaces = AppendCharMult(MaxCheatWidth - StrCheatWidth, ' ', CanvasContext, 5);
+		CanvasContext.Printf(TEXT("%ls %s {white}%ls"), *DataPack.ConsoleVariableNames[i], *Spaces, *DataPack.ConsoleVariableDescriptions[i]);
 	}
 
 	FGameplayDebuggerCategory::DrawData(OwnerPC, CanvasContext);
@@ -68,7 +90,6 @@ void FCheatSheet_GameplayDebuggerCategory::CollectData(APlayerController* OwnerP
 	{
 		DataPack.ConsoleVariableNames.Add(Name);
 		DataPack.ConsoleVariableDescriptions.Add(CVar->GetHelp()); 
-		UE_LOG(LogTemp, Warning, TEXT("Variable Name: %s"), Name);
 	};
 
 	for(auto& KeyWord : CheatKeyWords)
@@ -115,13 +136,15 @@ void FCheatSheet_GameplayDebuggerCategory::FRepData::Serialize(FArchive& Ar)
 
 void FCheatSheet_GameplayDebuggerCategory::DrawNextPage()
 {
-	CurrentCheatPage = (CurrentCheatPage + 1) <= MaxPagesCount ? CurrentCheatPage++ : 0;
+	CurrentCheatPage++;
+	CurrentCheatPage = CurrentCheatPage <= MaxPagesCount ? CurrentCheatPage++ : 0;
 	UE_LOG(LogTemp, Warning, TEXT("NextPage Draw, CurrentCheatPage: %i"), CurrentCheatPage);
 }
 
 void FCheatSheet_GameplayDebuggerCategory::DrawPrevPage()
 {
-	CurrentCheatPage = (CurrentCheatPage - 1) >= 0 ? CurrentCheatPage-- : MaxPagesCount;
+	CurrentCheatPage--;
+	CurrentCheatPage = CurrentCheatPage >= 0 ? CurrentCheatPage : MaxPagesCount;
 	UE_LOG(LogTemp, Warning, TEXT("PrevPage Draw, CurrentCheatPage: %i"), CurrentCheatPage);
 }
 
@@ -144,4 +167,49 @@ float FCheatSheet_GameplayDebuggerCategory::EvalStringLength(const FString& Stri
 	float X = 0.f, Y = 0.f;
 	CanvasContext.MeasureString(String, X, Y);
 	return X;
+}
+
+FString FCheatSheet_GameplayDebuggerCategory::AppendCharMult(float InWidth, const TCHAR& Char, const FGameplayDebuggerCanvasContext& CanvasContext, int32 AdditionalWidth)
+{
+	FString OutString;
+	float CharWidth = 0.0f, CharHeight = 0.0f;
+	CanvasContext.MeasureString(FString().AppendChar(Char), CharWidth, CharHeight);
+	float CountFlt = 0.0f;
+	FMath::Modf(InWidth / CharWidth, &CountFlt);
+	const int32 CountInt = static_cast<int32>(CountFlt) + AdditionalWidth;
+	for (int i = 0; i < CountInt; ++i)
+	{
+		OutString.AppendChar(Char);	
+	}
+	return OutString;
+}
+
+bool FCheatSheet_GameplayDebuggerCategory::WrapStringAccordingToViewport(const FString& StrIn, FString& StrOut,	FGameplayDebuggerCanvasContext& CanvasContext, float ViewportWitdh)
+{
+	if (!StrIn.IsEmpty())
+	{
+		// Clamp the Width
+		ViewportWitdh = FMath::Max(ViewportWitdh, 10.0f);
+
+		float StrWidth = 0.0f, StrHeight = 0.0f;
+		// Calculate the length(in pixel) of the tags
+		CanvasContext.MeasureString(StrIn, StrWidth, StrHeight);
+
+		int32 SubDivision = FMath::CeilToInt(StrWidth / ViewportWitdh);
+		if (SubDivision > 1)
+		{
+			// Copy the string
+			StrOut = StrIn;
+			const int32 Step = StrOut.Len() / SubDivision;
+			// Start sub divide if needed
+			for (int32 i = SubDivision - 1; i > 0; --i)
+			{
+				// Insert Line Feed
+				StrOut.InsertAt(i * Step - 1, '\n');
+			}
+			return true;
+		}
+	}
+	// No need to wrap the text 
+	return false;
 }
