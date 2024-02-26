@@ -43,8 +43,6 @@ private:
 	int32 CurrentCheatPage = 0;
 	int32 MaxPagesCount = 0;
 	
-	TPair<float, float> EvalLongestString(const TArray<FString>& Strings, const FGameplayDebuggerCanvasContext& CanvasContext);
-	float EvalStringLength(const FString& String, const FGameplayDebuggerCanvasContext& CanvasContext);
 	FString AppendCharMult(float InWidth, const TCHAR& Char, const FGameplayDebuggerCanvasContext& CanvasContext, int32 AdditionalWidth);
 	bool WrapStringAccordingToViewport(const FString& StrIn, FString& StrOut, FGameplayDebuggerCanvasContext& CanvasContext, float ViewportWitdh);
 };

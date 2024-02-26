@@ -21,6 +21,7 @@ namespace FCheatSheetNamespace
 {
 	float RefreshInterval = 5.f;
 	int32 MaxCheatPageRows = 20;
+	int32 SpacesWidthAfterName = 5;
 	FName NextPageKey = TEXT("Add");
 	FName PreviousPageKey = TEXT("Subtract");
 }
@@ -73,8 +74,13 @@ void FCheatSheet_GameplayDebuggerCategory::DrawData(APlayerController* OwnerPC,	
 	{
 		float StrCheatWidth = 0.0f, StrCheatHeight = 0.0f;
 		CanvasContext.MeasureString(DataPack.ConsoleVariableNames[i], StrCheatWidth, StrCheatHeight);
-		FString Spaces = AppendCharMult(MaxCheatWidth - StrCheatWidth, ' ', CanvasContext, 5);
-		CanvasContext.Printf(TEXT("%ls %s {white}%ls"), *DataPack.ConsoleVariableNames[i], *Spaces, *DataPack.ConsoleVariableDescriptions[i]);
+		FString Spaces = AppendCharMult(MaxCheatWidth - StrCheatWidth, ' ', CanvasContext, FCheatSheetNamespace::SpacesWidthAfterName);
+
+		//If Description string consists of multiple lines - add to every next line aligning offset
+		FString NewLineSpaces = AppendCharMult(MaxCheatWidth + FCheatSheetNamespace::SpacesWidthAfterName, ' ', CanvasContext, 5);
+		FString Description = DataPack.ConsoleVariableDescriptions[i].Replace(TEXT("\n"), *("\n" + NewLineSpaces));
+		
+		CanvasContext.Printf(TEXT("%ls %s {white}%ls"), *DataPack.ConsoleVariableNames[i], *Spaces, *Description);
 	}
 
 	FGameplayDebuggerCategory::DrawData(OwnerPC, CanvasContext);
@@ -146,27 +152,6 @@ void FCheatSheet_GameplayDebuggerCategory::DrawPrevPage()
 	CurrentCheatPage--;
 	CurrentCheatPage = CurrentCheatPage >= 0 ? CurrentCheatPage : MaxPagesCount;
 	UE_LOG(LogTemp, Warning, TEXT("PrevPage Draw, CurrentCheatPage: %i"), CurrentCheatPage);
-}
-
-TPair<float, float> FCheatSheet_GameplayDebuggerCategory::EvalLongestString(const TArray<FString>& Strings, const FGameplayDebuggerCanvasContext& CanvasContext)
-{
-	float MaxX = 0.f;
-	float MaxY = 0.f;
-	for(auto String : Strings)
-	{
-		float X = 0.f, Y = 0.f;
-		CanvasContext.MeasureString(String, X, Y);
-		MaxX = X > MaxX ? X : MaxX;
-		MaxY = Y > MaxY ? Y : MaxY;
-	}
-	return TPair<float, float>(MaxX, MaxY);
-}
-
-float FCheatSheet_GameplayDebuggerCategory::EvalStringLength(const FString& String, const FGameplayDebuggerCanvasContext& CanvasContext)
-{
-	float X = 0.f, Y = 0.f;
-	CanvasContext.MeasureString(String, X, Y);
-	return X;
 }
 
 FString FCheatSheet_GameplayDebuggerCategory::AppendCharMult(float InWidth, const TCHAR& Char, const FGameplayDebuggerCanvasContext& CanvasContext, int32 AdditionalWidth)
